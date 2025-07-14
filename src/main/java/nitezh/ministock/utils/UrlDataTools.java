@@ -31,8 +31,20 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.ConnectionSpec;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.TlsVersion;
+import okhttp3.logging.HttpLoggingInterceptor;
 
 
 public class UrlDataTools {
@@ -58,21 +70,41 @@ public class UrlDataTools {
     }
 
     private static String getUrlData(String url) {
-        // Ensure we always request some data
-        if (!url.contains("INDU")) {
-            url = url.replace("&s=", "&s=INDU+");
-        }
-
+        Log.i("PCPC", "Getting data " + url);
         try {
-            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setConnectTimeout(30000);
-            connection.setReadTimeout(60000);
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "Ministocks - Stocks Widget");
-            InputStream inputStream = connection.getInputStream();
-            return inputStreamToString(inputStream);
-        } catch (IOException ignored) {
-            Log.i("TAG", "getUrlData: " + ignored);
+            InetAddress[] addrs = InetAddress.getAllByName("gohorse.gafanho.to");
+            Log.d("DNS", Arrays.toString(addrs));
+        } catch (UnknownHostException e) {
+            Log.e("DNS", "Still failing", e);
+        }
+//        ConnectionSpec spec = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+//                .tlsVersions(TlsVersion.TLS_1_3, TlsVersion.TLS_1_2)
+//                .allEnabledCipherSuites()          // let CF pick the cipher
+//                .build();
+
+        HttpLoggingInterceptor log = new HttpLoggingInterceptor();
+        log.setLevel(HttpLoggingInterceptor.Level.HEADERS);
+
+        OkHttpClient client = new OkHttpClient.Builder()
+                .followRedirects(true)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)
+                .followSslRedirects(true)
+                .addInterceptor(log)
+                .build();
+
+
+        Request request = new Request.Builder()
+                .url(url)
+                .header("Accept", "*/*")
+                .build();
+
+        try (Response res = client.newCall(request).execute()) {
+            if (!res.isSuccessful()) throw new IOException("HTTP " + res.code());
+            Log.i("TAG", "getUrlData: returning: " + res.body());
+            return res.body().string();
+        } catch (Exception e) {
+            Log.i("TAG", "getUrlData: " + e);
         }
         return null;
     }

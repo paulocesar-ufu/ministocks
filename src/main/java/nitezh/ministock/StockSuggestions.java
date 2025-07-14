@@ -42,7 +42,7 @@ import nitezh.ministock.utils.UrlDataTools;
 
 class StockSuggestions {
 
-    private static final String BASE_URL = "https://query2.finance.yahoo.com/v1/finance/search?q=";
+    private static final String BASE_URL = "https://gohorse.gafanho.to/search_symbols?q=";
 
     static List<Map<String, String>> getSuggestions(String query) {
         List<Map<String, String>> suggestions = new ArrayList<>();
@@ -67,7 +67,7 @@ class StockSuggestions {
                 Map<String, String> suggestion = new HashMap<>();
                 JSONObject jsonO = jsonA.getJSONObject(i);
                 suggestion.put("symbol", jsonO.getString("symbol"));
-                suggestion.put("name", jsonO.getString("shortname"));
+                suggestion.put("name", jsonO.getString("name"));
                 suggestions.add(suggestion);
             }
             return suggestions;
