@@ -198,14 +198,20 @@ public class UrlDataTools {
     }
 
     public static String getCachedTradingViewData(List<String> symbols, Cache cache, Integer ttl) {
+        if(symbols.isEmpty()) {
+            return "";
+        }
+        String lastSymbol = symbols.get(symbols.size()-1);
+        String lastChar = lastSymbol.substring(lastSymbol.length()-1);
+        String cacheKey = "tradingview:" + String.join(",", symbols).length() + symbols.get(0).substring(symbols.get(0).length()-1) + lastChar;
         String data;
-        if (ttl != null && (data = cache.get("tradingview")) != null) {
+        if (ttl != null && (data = cache.get(cacheKey)) != null) {
             return data;
         }
 
         data = getTradingViewData(symbols);
         if (data != null) {
-            cache.put("tradingview", data, ttl);
+            cache.put(cacheKey, data, ttl);
             return data;
         }
         return "";
