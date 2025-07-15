@@ -26,6 +26,10 @@ package nitezh.ministock.utils;
 
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,8 +39,10 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.ConnectionSpec;
@@ -109,6 +115,51 @@ public class UrlDataTools {
         return null;
     }
 
+
+    private static String getUrlData(String url, List<String> symbols) {
+        symbols.remove("^DJI");
+        Log.i("PCPC", "Getting data for symbols" + symbols);
+        OkHttpClient client = new OkHttpClient.Builder()
+                .followRedirects(true)
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .followSslRedirects(true)
+                .build();
+        JSONArray data = new JSONArray();
+        for(String symbol : symbols) {
+            Log.i("PCPC", "Getting data " + url + symbol);
+            Request request = new Request.Builder()
+                    .url(url + symbol)
+                    .header("Accept", "*/*")
+                    .build();
+
+            try (Response res = client.newCall(request).execute()) {
+                if (!res.isSuccessful()) throw new IOException("HTTP " + res.code());
+                String body = res.body().string();
+                Log.i("TAG", "getUrlData: returning: " + body);
+                JSONObject obj = new JSONObject(body);
+                data.put(
+                        new JSONObject()
+                                .put("symbol", symbol)
+                                .put("price", obj.getDouble("close"))
+                                .put("percent", obj.getDouble("change"))
+                );
+            } catch (Exception e) {
+                Log.i("TAG", "getUrlData: " + e);
+            }
+        }
+        try {
+            if(data.length() > 0) {
+                JSONObject result = new JSONObject();
+                result.put("quoteResponse", new JSONObject().put("result", data));
+                return result.toString();
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
     public static String getCachedUrlData(String url, Cache cache, Integer ttl) {
         String data;
         if (ttl != null && (data = cache.get(url)) != null) {
@@ -122,4 +173,19 @@ public class UrlDataTools {
         }
         return "";
     }
+
+    public static String getCachedUrlData(String url, List<String> symbols, Cache cache, Integer ttl) {
+        String data;
+        if (ttl != null && (data = cache.get(url)) != null) {
+            return data;
+        }
+
+        data = getUrlData(url, symbols);
+        if (data != null) {
+            cache.put(url, data, ttl);
+            return data;
+        }
+        return "";
+    }
+
 }

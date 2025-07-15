@@ -99,6 +99,7 @@ class WidgetRow {
     }
 
     public void setSymbol(String symbol) {
+        symbol = symbol.split(":")[1];
         if (this.widget.getHideSuffix()) {
             int dotIndex = symbol.indexOf(".");
             if (dotIndex > -1) {
