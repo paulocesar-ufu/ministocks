@@ -43,17 +43,29 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.ConnectionSpec;
+import okhttp3.Dispatcher;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.TlsVersion;
 import okhttp3.logging.HttpLoggingInterceptor;
 
 
 public class UrlDataTools {
+
+    private static final OkHttpClient HTTP =
+            new OkHttpClient.Builder()
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .build();
 
     private UrlDataTools() {
     }
@@ -116,38 +128,49 @@ public class UrlDataTools {
     }
 
 
-    private static String getUrlData(String url, List<String> symbols) {
+    private static String getTradingViewData(List<String> symbols) {
         symbols.remove("^DJI");
         Log.i("PCPC", "Getting data for symbols" + symbols);
-        OkHttpClient client = new OkHttpClient.Builder()
-                .followRedirects(true)
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .followSslRedirects(true)
-                .build();
+
         JSONArray data = new JSONArray();
-        for(String symbol : symbols) {
-            Log.i("PCPC", "Getting data " + url + symbol);
+        try {
+            JSONObject payload = new JSONObject()
+                    .put("symbols", new JSONObject().put("tickers", new JSONArray(symbols)))
+                    .put("columns", new JSONArray(Arrays.asList("close", "change")));
+
             Request request = new Request.Builder()
-                    .url(url + symbol)
-                    .header("Accept", "*/*")
+                    .url("https://scanner.tradingview.com/global/scan")
+                    .post(RequestBody.create(
+                            payload.toString(),
+                            MediaType.parse("application/json")
+                            )
+                    )
                     .build();
 
-            try (Response res = client.newCall(request).execute()) {
-                if (!res.isSuccessful()) throw new IOException("HTTP " + res.code());
+            try (Response res = HTTP.newCall(request).execute()) {
+                if (!res.isSuccessful())
+                    throw new IOException("HTTP " + res.code() + " – " + res.message());
+
                 String body = res.body().string();
-                Log.i("TAG", "getUrlData: returning: " + body);
-                JSONObject obj = new JSONObject(body);
-                data.put(
-                        new JSONObject()
-                                .put("symbol", symbol)
-                                .put("price", obj.getDouble("close"))
-                                .put("percent", obj.getDouble("change"))
-                );
+                Log.i("TAG", "getTradingViewData: returning: " + body);
+                JSONArray items = new JSONObject(body).getJSONArray("data");
+                for (int i = 0; i < items.length(); i++) {
+                    JSONObject item = items.getJSONObject(i);
+                    JSONArray d = item.getJSONArray("d");
+                    double close  = d.getDouble(0);
+                    double change = d.getDouble(1);
+                    data.put(
+                            new JSONObject()
+                                    .put("symbol", item.getString("s"))
+                                    .put("price", close)
+                                    .put("percent", change)
+                    );
+
+                }
             } catch (Exception e) {
-                Log.i("TAG", "getUrlData: " + e);
+                Log.i("TAG", "getTradingViewData: " + e);
             }
-        }
-        try {
+
             if(data.length() > 0) {
                 JSONObject result = new JSONObject();
                 result.put("quoteResponse", new JSONObject().put("result", data));
@@ -174,15 +197,15 @@ public class UrlDataTools {
         return "";
     }
 
-    public static String getCachedUrlData(String url, List<String> symbols, Cache cache, Integer ttl) {
+    public static String getCachedTradingViewData(List<String> symbols, Cache cache, Integer ttl) {
         String data;
-        if (ttl != null && (data = cache.get(url)) != null) {
+        if (ttl != null && (data = cache.get("tradingview")) != null) {
             return data;
         }
 
-        data = getUrlData(url, symbols);
+        data = getTradingViewData(symbols);
         if (data != null) {
-            cache.put(url, data, ttl);
+            cache.put("tradingview", data, ttl);
             return data;
         }
         return "";

@@ -68,8 +68,7 @@ public class TradingViewStockQuoteRepository {
     }
 
     JSONArray retrieveQuotesAsJson(Cache cache, List<String> symbols) throws JSONException {
-        String url = BASE_URL;
-        String quotesString = UrlDataTools.getCachedUrlData(url, symbols, cache, 5);
+        String quotesString = UrlDataTools.getCachedTradingViewData(symbols, cache, 300);
         JSONArray quotesJson = new JSONObject(quotesString).getJSONObject("quoteResponse").getJSONArray("result");
 
         return quotesJson;
